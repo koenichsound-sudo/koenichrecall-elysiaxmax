@@ -1,0 +1,37 @@
+cmake_minimum_required(VERSION 3.22)
+set(CMAKE_OSX_ARCHITECTURES arm64 CACHE STRING "Apple Silicon")
+set(CMAKE_OSX_DEPLOYMENT_TARGET 12.0 CACHE STRING "Minimum macOS")
+project(KoenichRecall VERSION 1.0.2 LANGUAGES C CXX)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+if(NOT APPLE)
+  message(FATAL_ERROR "This release targets macOS Apple Silicon")
+endif()
+set(JUCE_SOURCE_DIR "" CACHE PATH "Optional local JUCE 8.0.15 checkout")
+if(JUCE_SOURCE_DIR)
+  add_subdirectory("${JUCE_SOURCE_DIR}" JUCE)
+else()
+  include(FetchContent)
+  FetchContent_Declare(JUCE GIT_REPOSITORY https://github.com/juce-framework/JUCE.git GIT_TAG 8.0.15 GIT_SHALLOW TRUE)
+  FetchContent_MakeAvailable(JUCE)
+endif()
+juce_add_binary_data(RecallAssets SOURCES Assets/frontpanel.png)
+juce_add_plugin(KoenichRecall
+ COMPANY_NAME "Koenich Sound" BUNDLE_ID "sound.koenich.recall.xmax"
+ PLUGIN_MANUFACTURER_CODE Koen PLUGIN_CODE KxM1
+ FORMATS VST3 PRODUCT_NAME "Koenich Recall - elysia xMax"
+ IS_SYNTH FALSE NEEDS_MIDI_INPUT FALSE NEEDS_MIDI_OUTPUT FALSE
+ IS_MIDI_EFFECT FALSE EDITOR_WANTS_KEYBOARD_FOCUS FALSE
+ COPY_PLUGIN_AFTER_BUILD FALSE VST3_CATEGORIES Fx Tools)
+target_sources(KoenichRecall PRIVATE Source/PluginProcessor.cpp Source/PluginEditor.cpp)
+target_compile_definitions(KoenichRecall PUBLIC JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_VST3_CAN_REPLACE_VST2=0)
+target_link_libraries(KoenichRecall PRIVATE RecallAssets juce::juce_audio_utils PUBLIC juce::juce_recommended_config_flags juce::juce_recommended_warning_flags)
+option(RECALL_BUILD_TESTS "Build processor verification and GUI capture" ON)
+if(RECALL_BUILD_TESTS)
+ juce_add_console_app(RecallTests PRODUCT_NAME RecallTests)
+ target_sources(RecallTests PRIVATE Tests/RecallTests.cpp Source/PluginProcessor.cpp Source/PluginEditor.cpp)
+ target_compile_definitions(RecallTests PRIVATE JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0 JUCE_VST3_CAN_REPLACE_VST2=0)
+ target_link_libraries(RecallTests PRIVATE RecallAssets juce::juce_audio_utils juce::juce_recommended_config_flags)
+ enable_testing()
+ add_test(NAME RecallTests COMMAND RecallTests)
+endif()
